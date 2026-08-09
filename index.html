@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A simple interactive case study on Physarum polycephalum and slime mould-inspired optimization.">
+  <title>Physarum Study | Slime Mould Optimization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Physarum Study home"><span class="brand-mark">✦</span> physarum<span>.study</span></a>
+    <nav class="nav" aria-label="Main navigation">
+      <a href="#biology">Biology</a><a href="#simulations">Simulations</a><a href="#team">Team</a>
+    </nav>
+    <a class="button button-small" href="assets/slime-mould-project-presentation.pptx" download>Download PPT</a>
+  </header>
+
+  <main id="top">
+    <section class="hero section-wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Interactive college case study · 2026</p>
+        <h1>A living network<br><em>finds its way.</em></h1>
+        <p class="hero-lede">How a brainless, single-celled organism explores food, strengthens useful tubes, and inspires smarter routes for cities and spacecraft.</p>
+        <div class="hero-actions"><a class="button" href="#simulations">Start the demo <span>→</span></a><a class="text-link" href="#story">Read the story</a></div>
+      </div>
+      <div class="hero-visual" aria-label="Animated slime mould network illustration"><canvas id="heroCanvas"></canvas><div class="hero-visual-label"><span class="status-dot"></span> Physarum polycephalum<br><small>self-organising network</small></div></div>
+    </section>
+
+    <section id="story" class="story section-wrap">
+      <div class="section-kicker">01 / The question</div>
+      <div class="story-grid"><h2>What if an organism with no brain could teach us how to connect a city?</h2><div><p>Optimization sounds like a computer problem. Physarum shows another route: grow everywhere at first, sense what is useful, then invest more material in the connections that work.</p><p class="muted">This site follows the story in your presentation, with the heavy mathematics kept in the downloadable paper.</p></div></div>
+    </section>
+
+    <section id="biology" class="biology section-wrap">
+      <div class="section-kicker">02 / The organism</div>
+      <div class="section-head"><h2>Three simple behaviours<br><em>make computation possible.</em></h2><p>Physarum is a plasmodial slime mould. Its body is a changing network of tubes, not a brain making plans.</p></div>
+      <div class="trait-grid"><article><span>01</span><h3>It explores</h3><p>Thin branches spread into several directions to sample the surrounding space.</p></article><article><span>02</span><h3>It senses food</h3><p>Oat flakes act as nutrient sources. Chemical signals and cytoplasmic flow guide growth.</p></article><article><span>03</span><h3>It reinforces</h3><p>Useful routes thicken. Weak branches receive less flow and gradually fade away.</p></article></div>
+      <div class="biology-note"><span class="note-line"></span><p>“The result is a near-optimal network without a central controller.”</p><span class="note-source">Based on Physarum experiments and the 2020 SMA paper</span></div>
+    </section>
+
+    <section id="simulations" class="demo section-wrap">
+      <div class="section-kicker">03 / Simulations</div>
+      <div class="section-head"><div><h2>Watch the network<br><em>find its shape.</em></h2><p>Choose one case study. Every mode uses the same simple story: explore, connect, reinforce, prune.</p></div><div class="demo-actions"><button class="button" id="growthStart">Start growth <span>▶</span></button><button class="button button-ghost" id="growthReset">Reset</button></div></div>
+      <div class="simulation-tabs" role="tablist" aria-label="Simulation choices"><button class="sim-tab is-active" data-sim="food" role="tab" aria-selected="true">Food search</button><button class="sim-tab" data-sim="tsp" role="tab" aria-selected="false">Travelling man</button><button class="sim-tab" data-sim="tokyo" role="tab" aria-selected="false">Tokyo rail</button><button class="sim-tab" data-sim="mumbai" role="tab" aria-selected="false">Mumbai Metro</button><button class="sim-tab" data-sim="cosmic" role="tab" aria-selected="false">Cosmic web</button></div>
+      <div class="lab-shell"><div class="lab-top"><span><i class="live-dot"></i> LIVE MODEL</span><span id="growthPhase">Ready to explore</span></div><canvas id="growthCanvas" aria-label="Interactive slime mould simulation"></canvas><div class="lab-bottom"><label class="food-control" for="foodCount">Food sources <output id="foodCountValue">6</output></label><input class="food-control" id="foodCount" type="range" min="3" max="12" value="6"><span class="lab-hint" id="simExplain">The mould grows outward, senses food, and reinforces connected tubes.</span></div></div>
+      <div class="what-seeing"><strong>What you are seeing</strong><p>Branches are drawn as connected tubes, not scattered particles. Bright gold routes are the paths receiving stronger flow; faint branches represent exploration that is gradually deprioritised.</p></div>
+    </section>
+
+    <section id="mumbai" class="mumbai section-wrap">
+      <div class="section-kicker">04 / Urban planning</div>
+      <div class="section-head"><div><h2>Mumbai Metro,<br><em>grown as a network.</em></h2><p>Food sources are placed at important stations. The simulated slime explores the map, then highlights the stronger connections between them.</p></div><div class="demo-actions"><button class="button" id="metroStart">Grow Mumbai network <span>▶</span></button><button class="button button-ghost" id="metroReset">Reset</button></div></div>
+      <div class="metro-lab"><div class="metro-map"><img src="assets/mumbai-metro-map.png" alt="Mumbai Metro network map"><canvas id="metroCanvas"></canvas><div class="metro-legend"><span><i class="legend-food"></i> food source</span><span><i class="legend-vein"></i> reinforced tube</span></div></div><div class="metro-side"><p class="eyebrow">The five stages</p><ol><li><b>Place sources</b><span>Stations become oat flakes.</span></li><li><b>Explore</b><span>Many weak branches appear.</span></li><li><b>Reinforce</b><span>Useful corridors grow brighter.</span></li><li><b>Prune</b><span>Unhelpful branches fade.</span></li><li><b>Optimise</b><span>A compact network remains.</span></li></ol><a class="reference-link" href="assets/mumbai-metro-stages-reference.png" target="_blank">View stage reference ↗</a></div></div>
+    </section>
+
+    <section class="applications section-wrap"><div class="section-kicker">05 / Why it matters</div><div class="section-head"><h2>From petri dish<br><em>to real problems.</em></h2><p>The same idea can be translated into computational models for path planning, transport design and scientific mapping.</p></div><div class="application-grid"><article><span class="app-number">01</span><h3>Urban planning</h3><p>Compare routes between population centres and reduce unnecessary travel.</p></article><article><span class="app-number">02</span><h3>Space exploration</h3><p>Help a rover choose a safe, energy-aware path around rough terrain.</p></article><article><span class="app-number">03</span><h3>Cosmic mapping</h3><p>Trace filament-like structures in the large-scale distribution of galaxies.</p></article></div></section>
+
+    <section class="timeline section-wrap"><div class="section-kicker">06 / A short timeline</div><div class="timeline-list"><div><span>2000</span><h3>Maze experiment</h3><p>Physarum connected food sources through a maze.</p></div><div><span>2010</span><h3>Tokyo rail network</h3><p>A biological network closely resembled an efficient transport map.</p></div><div><span>2020</span><h3>Slime Mould Algorithm</h3><p>Li et al. formalised the behaviour as a stochastic optimisation method.</p></div></div></section>
+
+    <section id="team" class="team section-wrap"><div class="section-kicker">07 / The team</div><div class="section-head"><h2>Built for the<br><em>classroom.</em></h2><p>Slime Mould-Inspired Optimization Algorithms: Urban Planning &amp; Space Exploration Pathfinding.</p></div><div class="team-grid"><article><img src="assets/Suhaan.jpg" alt="Suhaan Balpande"><small>SAP ID · 70022600870</small><h3>Suhaan Balpande</h3></article><article><img src="assets/Ranvir.jpg" alt="Ranvirr Bhakri"><small>SAP ID · 70022600852</small><h3>Ranvirr Bhakri</h3></article><article><img src="assets/Paarth.jpg" alt="Paarth Asapuri"><small>SAP ID · 70022600868</small><h3>Paarth Asapuri</h3></article><article><img src="assets/Aayush.jpg" alt="Aayush Baluapuri"><small>SAP ID · 70322300056</small><h3>Aayush Baluapuri</h3></article></div></section>
+
+    <section class="references section-wrap"><div><p class="eyebrow">For the presentation</p><h2>Keep the explanation simple.<br><em>Keep the sources honest.</em></h2></div><div class="reference-actions"><a class="button" href="assets/slime-mould-project-presentation.pptx" download>Download presentation ↓</a><a class="button button-ghost" href="assets/slime-mould-algorithm-paper.pdf" download>Download research paper ↓</a></div><p class="citation">Primary algorithm source: Li, S. et al. “Slime mould algorithm: A new method for stochastic optimization.” Future Generation Computer Systems, 2020. DOI: 10.1016/j.future.2020.03.055</p></section>
+  </main>
+  <footer><span>physarum.study · a student case study</span><span>Built by Suhaan · Ranvirr · Paarth · Aayush</span></footer>
+  <script src="app.js"></script>
+</body>
+</html>
