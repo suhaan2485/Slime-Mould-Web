@@ -17,3 +17,9 @@ Then open <http://localhost:4173>.
 Upload the contents of this folder to a GitHub repository, then choose **Settings -> Pages -> Deploy from a branch**, select the branch and `/root` folder, and save. No API key or paid AI service is required by the website.
 
 The site includes the updated PowerPoint presentation, research paper, team portraits, Mumbai Metro map, and supplied reference visuals under `assets/`.
+
+
+
+https://github.com/user-attachments/assets/2bb627b7-8103-4443-9a81-7d18fc064e7e
+
+
