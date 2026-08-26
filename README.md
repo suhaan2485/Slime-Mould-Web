@@ -1,25 +1,30 @@
-# Physarum Study
+# Physarum Study | Agent-Based Slime Mould Optimization
 
-This is a self-contained static website for the slime mould case-study demo. The Simulations section includes Food Search, Travelling Man, Tokyo Rail, and Mumbai Metro modes. The animations are intentionally presentation-scale teaching models: they show connected exploration, reinforcement, and pruning without requiring an external API.
+An interactive biological simulation showcase demonstrating *Physarum polycephalum* transport network optimization, chemotaxis, and biological pathfinding algorithms.
 
-## Run locally
+## Features
 
-From this folder, run:
+- **Biological Agent Engine (16,000 Particles):** Implements Jeff Jones' sensory-motor loop algorithm (Sensory Angle, Sensory Distance, Chemotaxis, 2D Pheromone Trail Grid with Gaussian Blur Diffusion and Decay).
+- **Interactive Food Node Placement:** Click anywhere on the simulation canvas to place custom food attractors in real time.
+- **5 Simulation Presets:**
+  1. **Food Chemotaxis:** Radial foraging and tendril reinforcement.
+  2. **Traveling Salesperson (TSP):** Biological minimal spanning connection across 9 cities.
+  3. **Tokyo Rail Network:** Simulates the classic 2010 Tero et al. experiment mapping Tokyo stations.
+  4. **Mumbai Metro Network:** Biological transport route generation over the Mumbai transit map.
+  5. **Cosmic Web Filaments:** Cyan bioluminescent dark matter filament network model connecting galaxy clusters.
+- **Interactive Parameters Dashboard:** Real-time controls for Agent Speed, Sensor Angle, and Trail Decay Rate.
+- **State-of-the-Art Design:** Glassmorphic UI, deep bio-luminescent glow themes, dark mode aesthetics, and responsive layout.
+
+## Run Locally
+
+From this directory, start any static web server:
 
 ```bash
 python3 -m http.server 4173
 ```
 
-Then open <http://localhost:4173>.
+Then open [http://localhost:4173](http://localhost:4173) in your browser.
 
-## Publish with GitHub Pages
+## Published & Deployed
 
-Upload the contents of this folder to a GitHub repository, then choose **Settings -> Pages -> Deploy from a branch**, select the branch and `/root` folder, and save. No API key or paid AI service is required by the website.
-
-The site includes the updated PowerPoint presentation, research paper, team portraits, Mumbai Metro map, and supplied reference visuals under `assets/`.
-
-
-
-https://github.com/user-attachments/assets/2bb627b7-8103-4443-9a81-7d18fc064e7e
-
-
+Designed by Suhaan Balpande, Ranvirr Bhakri, Paarth Asapuri, and Aayush Baluapuri for academic case study presentation (NMIMS Mumbai).
