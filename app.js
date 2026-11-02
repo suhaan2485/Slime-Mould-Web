@@ -256,6 +256,37 @@
       if (icon) icon.textContent = tick >= BIO_TICKS ? '↻' : running ? 'Ⅱ' : '▶';
     }
 
+    function seedFlowParticles() {
+      const branchCount = simData.shortest.length;
+      const count = mode === 'cosmic' ? 140 : mode === 'tokyo' ? 118 : 96;
+      simData.flowParticles = branchCount ? Array.from({ length: count }, (_, index) => ({
+        branch: index % branchCount,
+        position: rand(0, 1),
+        speed: rand(0.0018, 0.0048),
+        size: rand(0.8, 2.2),
+        delay: rand(0, 0.22)
+      })) : [];
+    }
+
+    function updateDashboard(progress) {
+      const agents = document.getElementById('agentCount');
+      const foods = document.getElementById('foodCount');
+      const state = document.getElementById('networkState');
+      const routeState = document.getElementById('routeState');
+      const progressBar = document.getElementById('stageProgress');
+      if (agents) agents.textContent = String(simData.flowParticles?.length || 0).padStart(2, '0');
+      if (foods) foods.textContent = String(simData.nodes.length).padStart(2, '0');
+      const route = tick >= BIO_TICKS ? 'OPTIMAL PATH' : tick >= STAGE_TWO_END ? 'REINFORCED' : tick >= STAGE_ONE_END ? 'FLOW CONTACT' : 'EXPLORING';
+      if (state) state.textContent = route;
+      if (routeState) routeState.textContent = route === 'OPTIMAL PATH' ? 'OPTIMAL NETWORK LOCKED' : `${route} NETWORK`;
+      if (progressBar) progressBar.style.width = `${progress * 100}%`;
+      document.querySelectorAll('.stage-step').forEach((step) => {
+        const stage = Number(step.dataset.stage);
+        const active = (stage === 1 && tick < STAGE_ONE_END) || (stage === 2 && tick >= STAGE_ONE_END && tick < STAGE_TWO_END) || (stage === 3 && tick >= STAGE_TWO_END);
+        step.classList.toggle('is-live', active);
+      });
+    }
+
     function mazeGeometry(width, height) {
       const cols = MAZE_GRID[0].length;
       const rows = MAZE_GRID.length;
@@ -267,7 +298,7 @@
     function initMode() {
       const [width, height] = fitCanvas(canvas);
       tick = 0;
-      simData = { origin: { x: width / 2, y: height / 2 }, nodes: [], shortest: [], deadends: [], stars: [] };
+      simData = { origin: { x: width / 2, y: height / 2 }, nodes: [], shortest: [], deadends: [], stars: [], flowParticles: [] };
       if (clickHint) clickHint.style.display = interactiveModes.has(mode) ? 'block' : 'none';
       if (labTitle) labTitle.textContent = titles[mode];
 
@@ -328,6 +359,7 @@
         simData.stars = Array.from({ length: 80 }, () => ({ x: rand(0, width), y: rand(0, height), r: rand(0.4, 1.6), a: rand(0.2, 0.7) }));
       }
 
+      seedFlowParticles();
       if (explainEl) explainEl.textContent = copyTexts[mode];
       updateLifecycle(phaseEl, timerEl, tick);
       setRunButton();
@@ -374,6 +406,29 @@
         const reinforced = tick >= STAGE_TWO_END;
         drawVein(ctx, branch, clamp(progress * 1.55 - i * 0.035, 0, 1), 0.95, mode === 'cosmic' ? '#6dd4d2' : '#f3be38', reinforced ? 4.3 : 2.5, reinforced ? 18 : 8, tick, mode !== 'maze');
       });
+      simData.flowParticles.forEach((particle) => {
+        const branch = simData.shortest[particle.branch];
+        if (!branch || branch.length < 2) return;
+        const visible = clamp(progress * 2.1 - particle.delay, 0, 1);
+        if (visible <= 0) return;
+        particle.position = (particle.position + (running ? particle.speed : 0)) % 1;
+        const scaled = particle.position * (branch.length - 1);
+        const index = Math.min(branch.length - 2, Math.floor(scaled));
+        const local = scaled - index;
+        const a = branch[index];
+        const b = branch[index + 1];
+        const x = a.x + (b.x - a.x) * local;
+        const y = a.y + (b.y - a.y) * local;
+        ctx.globalAlpha = visible * 0.8;
+        ctx.fillStyle = mode === 'cosmic' ? '#b8f5ff' : '#fff0a2';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = mode === 'cosmic' ? '#6dd4d2' : '#f3be38';
+        ctx.beginPath();
+        ctx.arc(x, y, particle.size, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      });
       if (simData.origin && ['food', 'tokyo', 'mumbai'].includes(mode)) {
         ctx.shadowBlur = 24;
         ctx.shadowColor = '#f3be38';
@@ -398,8 +453,9 @@
         }
       });
       ctx.globalCompositeOperation = 'source-over';
+      updateDashboard(progress);
       if (running && tick < BIO_TICKS) {
-        tick = Math.min(BIO_TICKS, tick + 1);
+        tick = Math.min(BIO_TICKS, tick + 2);
         raf = requestAnimationFrame(draw);
       } else {
         running = false;
@@ -426,6 +482,7 @@
         simData.nodes.push(node);
         simData.shortest.push(createOrganicBranch([simData.origin, { x: (simData.origin.x + x) / 2, y: (simData.origin.y + y) / 2 }, node], 5));
       }
+      seedFlowParticles();
       tick = Math.min(tick, STAGE_ONE_END);
       running = true;
       cancelAnimationFrame(raf);
@@ -553,7 +610,7 @@
       });
       ctx.globalCompositeOperation = 'source-over';
       if (running && tick < BIO_TICKS) {
-        tick = Math.min(BIO_TICKS, tick + 1);
+        tick = Math.min(BIO_TICKS, tick + 2);
         raf = requestAnimationFrame(draw);
       } else {
         running = false;
