@@ -189,34 +189,41 @@
   function hero() {
     const canvas = document.getElementById('heroCanvas');
     if (!canvas) return;
-    const particles = [];
-    function frame() {
+    let lastSize = '';
+    let branches = [];
+    function frame(time) {
       const [width, height, ctx] = fitCanvas(canvas);
-      if (!particles.length) {
-        for (let i = 0; i < 42; i += 1) particles.push({ x: width / 2 + rand(-15, 15), y: height / 2 + rand(-15, 15), a: rand(0, TAU), speed: rand(0.6, 1.2) });
+      const size = `${width}x${height}`;
+      if (size !== lastSize) {
+        lastSize = size;
+        const cx = width * 0.50;
+        const cy = height * 0.52;
+        branches = [
+          [[cx, cy], [width * 0.43, height * 0.46], [width * 0.33, height * 0.38], [width * 0.23, height * 0.31]],
+          [[cx, cy], [width * 0.56, height * 0.42], [width * 0.64, height * 0.32], [width * 0.72, height * 0.26]],
+          [[cx, cy], [width * 0.58, height * 0.56], [width * 0.70, height * 0.61], [width * 0.80, height * 0.58]],
+          [[cx, cy], [width * 0.44, height * 0.61], [width * 0.34, height * 0.70], [width * 0.25, height * 0.76]],
+          [[width * 0.43, height * 0.46], [width * 0.38, height * 0.35], [width * 0.40, height * 0.23]],
+          [[width * 0.56, height * 0.42], [width * 0.57, height * 0.30], [width * 0.54, height * 0.20]]
+        ].map((branch) => createOrganicBranch(branch.map(([x, y]) => ({ x, y })), 3, 8));
       }
-      ctx.fillStyle = 'rgba(7, 16, 29, 0.2)';
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#050c16';
       ctx.fillRect(0, 0, width, height);
       ctx.globalCompositeOperation = 'lighter';
-      particles.forEach((particle) => {
-        particle.a += rand(-0.035, 0.035);
-        particle.x = clamp(particle.x + Math.cos(particle.a) * particle.speed, 20, width - 20);
-        particle.y = clamp(particle.y + Math.sin(particle.a) * particle.speed, 20, height - 20);
-        ctx.strokeStyle = 'rgba(243, 190, 56, 0.35)';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.moveTo(particle.x, particle.y);
-        ctx.lineTo(particle.x - Math.cos(particle.a) * 18, particle.y - Math.sin(particle.a) * 18);
-        ctx.stroke();
-        ctx.fillStyle = '#f3be38';
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, 1.5, 0, TAU);
-        ctx.fill();
-      });
+      const pulse = 0.58 + Math.sin(time * 0.0012) * 0.10;
+      branches.forEach((branch, index) => drawVein(ctx, branch, 1, pulse - index * 0.045, index < 4 ? '#f3be38' : '#6dd4d2', index < 4 ? 1.4 : 1, 6, time * 0.08, false));
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#f3be38';
+      ctx.fillStyle = '#ffe066';
+      ctx.beginPath();
+      ctx.arc(width * 0.50, height * 0.52, 5 + Math.sin(time * 0.0015) * 1.2, 0, TAU);
+      ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       requestAnimationFrame(frame);
     }
-    frame();
+    requestAnimationFrame(frame);
   }
 
   function makeEdge(nodes, a, b, jitter = 0) {
@@ -434,6 +441,8 @@
     network.nodes.forEach((node, index) => {
       const isSink = index === network.sink;
       const isSource = network.sources.has(index);
+      const showNode = isSource || isSink || labelSize > 7;
+      if (!showNode) return;
       ctx.shadowBlur = isSource || isSink ? 18 : 8;
       ctx.shadowColor = isSink ? '#6dd4d2' : color;
       ctx.fillStyle = isSink ? '#b8f5ff' : isSource ? '#fff0a2' : '#d7e9ed';
@@ -649,7 +658,10 @@
       const start = canvas._touchStart;
       canvas._touchStart = null;
       lastTouchAt = Date.now();
-      if (Math.hypot(touch.clientX - start.clientX, touch.clientY - start.clientY) < 24) addFoodAt(...Object.values(pointFromEvent(touch)));
+      if (Math.hypot(touch.clientX - start.clientX, touch.clientY - start.clientY) < 24) {
+        const point = pointFromEvent(touch);
+        addFoodAt(point.x, point.y);
+      }
     }, { passive: false });
 
     startBtn?.addEventListener('click', () => {
