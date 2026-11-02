@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Physarum polycephalum biological computing lab: interactive maze, food search, TSP, Tokyo rail, cosmic web, and Mumbai Metro models.">
+  <meta name="description" content="Physarum polycephalum biological computing lab: pressure-flow adaptive network models for maze, food search, travelling man, Tokyo rail, cosmic web, and Mumbai Metro.">
   <title>PHYSARUM // Biological Computing Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=physarum-v5">
+  <link rel="stylesheet" href="styles.css?v=physarum-v6">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -86,7 +86,7 @@
         </div>
         <div class="lab-stage">
           <canvas id="growthCanvas" aria-label="Interactive slime mould simulation"></canvas>
-          <div class="canvas-hud hud-top-left"><span class="micro-label">FIELD STATUS</span><strong>NO CENTRAL CONTROLLER</strong><small>LOCAL AGENTS / POSITIVE FEEDBACK</small></div>
+          <div class="canvas-hud hud-top-left"><span class="micro-label">FIELD STATUS</span><strong>NO CENTRAL CONTROLLER</strong><small>PRESSURE BALANCE / POSITIVE FEEDBACK</small></div>
           <div class="canvas-hud hud-bottom-left"><span class="micro-label">READOUT</span><strong id="routeState">EXPLORATORY NETWORK</strong><small id="simExplain">Nakagaki's Maze Experiment (2000): the mould explores every open corridor, reaches the food sources, and reinforces only corridor-safe routes.</small></div>
           <div class="canvas-click-hint" id="clickHint">✦ Click or tap to add a food source</div>
           <div class="canvas-crosshair" aria-hidden="true"></div>
@@ -104,9 +104,9 @@
       </div>
 
       <div class="metric-row" aria-label="Live model metrics">
-        <div><span class="metric-label">AGENT FIELD</span><strong id="agentCount">96</strong><small>flowing traces</small></div>
-        <div><span class="metric-label">FOOD SOURCES</span><strong id="foodCount">04</strong><small>nutrient nodes</small></div>
-        <div><span class="metric-label">NETWORK STATE</span><strong id="networkState">DYNAMIC</strong><small>reinforcement active</small></div>
+        <div><span class="metric-label">ACTIVE TUBES</span><strong id="agentCount">00</strong><small>conductance above threshold</small></div>
+        <div><span class="metric-label">FOOD SOURCES</span><strong id="foodCount">02</strong><small>nutrient pressure nodes</small></div>
+        <div><span class="metric-label">NETWORK STATE</span><strong id="networkState">EXPLORING</strong><small>flow feedback active</small></div>
         <div><span class="metric-label">FRAME RATE</span><strong>60</strong><small>canvas frames / sec</small></div>
       </div>
     </section>
@@ -114,18 +114,18 @@
     <section id="research" class="research section-wrap">
       <div class="section-heading compact"><div><p class="section-tag">02 / RESEARCH + DOCUMENTATION</p><h2>Small rules.<br><span>Large consequences.</span></h2></div><p>A visual field guide to the mechanism behind the models — and the boundary between an educational simulation and a living organism.</p></div>
       <div class="research-grid">
-        <article class="research-card research-feature"><span class="card-number">A / BIOLOGY</span><h3>Cytoplasmic flow is the computation.</h3><p>Physarum is a multinucleate plasmodium. Tubes contract rhythmically; stronger nutrient flux reinforces a tube while low-use branches lose material and fade.</p><div class="equation">flow ∝ nutrient contact × tube efficiency</div></article>
-        <article class="research-card"><span class="card-number">B / MODEL</span><h3>Explore first.</h3><p>Agents spread outward from an inoculation point and sample nearby signal. The field is deliberately over-connected before it becomes economical.</p></article>
-        <article class="research-card"><span class="card-number">C / MODEL</span><h3>Reinforce what works.</h3><p>As a route reaches more food, it receives more animated flow and is rendered as a thicker, brighter vein.</p></article>
+        <article class="research-card research-feature"><span class="card-number">A / BIOLOGY</span><h3>Cytoplasmic flow is the computation.</h3><p>Physarum is a multinucleate plasmodium. Contractile tube walls drive rhythmic shuttle flow; nutrient-supported tubes carry more pressure-driven flow and strengthen, while low-use branches lose material.</p><div class="equation">conductance change ∝ flow − tube decay</div></article>
+        <article class="research-card"><span class="card-number">B / MODEL</span><h3>Explore first.</h3><p>The simulated plasmodium begins with a low-conductance tube field over the available substrate. Pressure balance then reveals which connections can carry nutrient flow.</p></article>
+        <article class="research-card"><span class="card-number">C / MODEL</span><h3>Reinforce what works.</h3><p>Each step solves for network pressure and adapts tube conductance to flow magnitude. This is the Physarum mechanism behind the route selection—not a genetic algorithm.</p></article>
         <article class="research-card"><span class="card-number">D / LIMITATION</span><h3>Biologically inspired, not a lab.</h3><p>The website is a deterministic teaching model. It reproduces the observed search–reinforcement–pruning story, not every molecular process inside a real culture.</p></article>
       </div>
-      <div class="source-row"><span>PRIMARY SOURCE</span><strong>Li et al. · Slime mould algorithm · Future Generation Computer Systems · 2020</strong><span class="source-status">REFERENCE READY ↗</span></div>
+      <div class="source-row"><span>PRIMARY SOURCES</span><strong>Nakagaki et al. · Nature 2000 &nbsp;|&nbsp; Tero et al. · Science 2010 &nbsp;|&nbsp; Alim et al. · PNAS 2017</strong><span class="source-status">REFERENCE READY ↗</span></div>
     </section>
 
     <section id="presentation" class="presentation section-wrap">
-      <div class="section-heading compact"><div><p class="section-tag">03 / EMBEDDED PROJECT PRESENTATION</p><h2>The complete<br><span>project deck.</span></h2></div><p>27 slides, embedded directly from Canva so the research, model rationale, applications, and case study stay inside the website.</p></div>
+      <div class="section-heading compact"><div><p class="section-tag">03 / EMBEDDED PROJECT PRESENTATION</p><h2>The complete<br><span>project deck.</span></h2></div><p>26 slides, embedded directly from Canva so the research, model rationale, applications, and case study stay inside the website.</p></div>
       <div class="presentation-frame">
-        <div class="presentation-chrome"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-label">PROJECT_PRESENTATION / CANVA_VIEW</span><span class="chrome-pages">27 PAGES</span></div>
+        <div class="presentation-chrome"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-label">PROJECT_PRESENTATION / CANVA_VIEW</span><span class="chrome-pages">26 PAGES</span></div>
         <iframe title="Embedded Physarum project presentation" src="https://www.canva.com/design/DAHZNl61o84/nnyr9t98mYhLzTkaTeFdaw/view?embed" loading="lazy" allow="fullscreen" allowfullscreen></iframe>
       </div>
     </section>
@@ -141,15 +141,15 @@
     <section id="team" class="team section-wrap">
       <div class="section-heading compact"><div><p class="section-tag">05 / PROJECT TEAM</p><h2>The people<br><span>behind the field.</span></h2></div><p>Project members, research identifiers, and the academic details required for assessment.</p></div>
       <div class="team-grid">
-        <article class="member-card"><div class="member-photo"><img src="assets/Suhaan.jpg" alt="Suhaan Balpande"></div><div class="member-body"><span class="member-role">PROJECT LEAD / WEB SYSTEM</span><h3>Suhaan Balpande</h3><div class="member-meta"><span><b>SAP ID</b>70022600870</span><span><b>ROLL NO.</b>To be supplied</span><span><b>DIVISION</b>To be supplied</span></div></div></article>
-        <article class="member-card"><div class="member-photo"><img src="assets/Ranvir.jpg" alt="Ranvirr Bhakri"></div><div class="member-body"><span class="member-role">RESEARCH / PRESENTATION</span><h3>Ranvirr Bhakri</h3><div class="member-meta"><span><b>SAP ID</b>70022600852</span><span><b>ROLL NO.</b>To be supplied</span><span><b>DIVISION</b>To be supplied</span></div></div></article>
-        <article class="member-card"><div class="member-photo"><img src="assets/Paarth.jpg" alt="Paarth Asapuri"></div><div class="member-body"><span class="member-role">MODEL / VISUAL SYSTEM</span><h3>Paarth Asapuri</h3><div class="member-meta"><span><b>SAP ID</b>70022600868</span><span><b>ROLL NO.</b>To be supplied</span><span><b>DIVISION</b>To be supplied</span></div></div></article>
-        <article class="member-card"><div class="member-photo"><img src="assets/Aayush.jpg" alt="Aayush Baluapuri"></div><div class="member-body"><span class="member-role">DOCUMENTATION / ANALYSIS</span><h3>Aayush Baluapuri</h3><div class="member-meta"><span><b>SAP ID</b>70322300056</span><span><b>ROLL NO.</b>To be supplied</span><span><b>DIVISION</b>To be supplied</span></div></div></article>
+        <article class="member-card"><div class="member-photo"><img src="assets/Suhaan.jpg" alt="Suhaan Balpande"></div><div class="member-body"><span class="member-role">PROJECT LEAD / WEB SYSTEM</span><h3>Suhaan Balpande</h3><div class="member-meta"><span><b>SAP ID</b>70022600870</span><span><b>ROLL NO.</b>C166</span></div></div></article>
+        <article class="member-card"><div class="member-photo"><img src="assets/Ranvir.jpg" alt="Ranvirr Bhakri"></div><div class="member-body"><span class="member-role">RESEARCH / PRESENTATION</span><h3>Ranvirr Bhakri</h3><div class="member-meta"><span><b>SAP ID</b>70022600852</span><span><b>ROLL NO.</b>C168</span></div></div></article>
+        <article class="member-card"><div class="member-photo"><img src="assets/Paarth.jpg" alt="Paarth Asapuri"></div><div class="member-body"><span class="member-role">MODEL / VISUAL SYSTEM</span><h3>Paarth Asapuri</h3><div class="member-meta"><span><b>SAP ID</b>70022600868</span><span><b>ROLL NO.</b>C165</span></div></div></article>
+        <article class="member-card"><div class="member-photo"><img src="assets/Aayush.jpg" alt="Aayush Baluapuri"></div><div class="member-body"><span class="member-role">DOCUMENTATION / ANALYSIS</span><h3>Aayush Baluapuri</h3><div class="member-meta"><span><b>SAP ID</b>70322300056</span><span><b>ROLL NO.</b>C160</span></div></div></article>
       </div>
     </section>
   </main>
 
   <footer class="footer"><div><span class="brand-mini">PHYSARUM<span>.LAB</span></span><span>academic biological computing case study</span></div><span>NMIMS MUMBAI // 2026</span></footer>
-  <script src="app.js?v=physarum-v5"></script>
+  <script src="app.js?v=physarum-v6"></script>
 </body>
 </html>

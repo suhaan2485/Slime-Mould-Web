@@ -1,5 +1,5 @@
 /**
- * PHYSARUM POLYCEPHALUM SIMULATION ENGINE v4.0
+ * PHYSARUM POLYCEPHALUM SIMULATION ENGINE v5.0
  *
  * The visual model uses a normalized 360-tick lifecycle:
  *   0–126  exploratory foraging
@@ -171,12 +171,9 @@
   const MUMBAI_LINES = [[0, 2, 3, 4, 5], [1, 2, 6, 7, 8], [1, 6, 9, 10], [4, 7]];
 
   function phaseForTick(tick) {
-    if (tick < STAGE_ONE_END) {
-      return { label: 'Stage 1 / Exploratory Foraging', deadendOpacity: clamp(tick / STAGE_ONE_END, 0, 1) * 0.78 };
-    }
-    if (tick < STAGE_TWO_END) return { label: 'Stage 2 / Food Contact & Cytoplasmic Flow', deadendOpacity: 0.78 };
-    const fade = clamp((tick - STAGE_TWO_END) / (BIO_TICKS - STAGE_TWO_END), 0, 1);
-    return { label: 'Stage 3 / Pruning to Optimal Network', deadendOpacity: 0.78 * (1 - fade) };
+    if (tick < STAGE_ONE_END) return { label: 'Stage 1 / Exploratory Foraging' };
+    if (tick < STAGE_TWO_END) return { label: 'Stage 2 / Food Contact & Cytoplasmic Flow' };
+    return { label: 'Stage 3 / Pruning to Optimal Network' };
   }
 
   function updateLifecycle(phaseEl, timerEl, tick) {
@@ -222,6 +219,237 @@
     frame();
   }
 
+  function makeEdge(nodes, a, b, jitter = 0) {
+    const start = nodes[a];
+    const end = nodes[b];
+    const length = Math.max(1, Math.hypot(end.x - start.x, end.y - start.y));
+    return { a, b, length, conductance: 0.12 + rand(0, 0.04), flow: 0, activity: 0, phase: rand(0, TAU), points: createOrganicBranch([start, end], jitter, 10) };
+  }
+
+  function uniquePairs(pairs) {
+    const seen = new Set();
+    return pairs.filter(([a, b]) => {
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      if (a === b || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function linePairs(line) {
+    return line.slice(1).map((node, index) => [line[index], node]);
+  }
+
+  function nearestNodeIndex(nodes, x, y) {
+    let best = 0;
+    let bestDistance = Infinity;
+    nodes.forEach((node, index) => {
+      const distance = Math.hypot(node.x - x, node.y - y);
+      if (distance < bestDistance) {
+        best = index;
+        bestDistance = distance;
+      }
+    });
+    return best;
+  }
+
+  function nearestPairs(nodes, count = 3) {
+    const pairs = [];
+    nodes.forEach((node, index) => {
+      nodes.map((other, otherIndex) => ({ other, otherIndex, distance: Math.hypot(node.x - other.x, node.y - other.y) }))
+        .filter((item) => item.otherIndex !== index)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, count)
+        .forEach((item) => pairs.push([index, item.otherIndex]));
+    });
+    return uniquePairs(pairs);
+  }
+
+  /*
+   * Physarum-style adaptive tube network.
+   *
+   * This is a pressure/flow model, not a genetic algorithm and not an
+   * agent swarm. Food nodes are held at a nutrient pressure, the inoculation
+   * node is the sink, and tube conductance adapts to the magnitude of flow:
+   * D <- D + rate * (exploration floor + flow response - D).
+   * The flow is recalculated from Kirchhoff-style pressure balance each step.
+   * It captures the observed positive feedback: useful tubes carry more
+   * cytoplasm and thicken; low-use tubes lose conductance and dissolve.
+   */
+  function createPhysarumNetwork(nodes, pairs, sourceIndices, sinkIndex, jitter = 0) {
+    const network = {
+      nodes,
+      edges: uniquePairs(pairs).map(([a, b]) => makeEdge(nodes, a, b, jitter)),
+      sources: new Set(sourceIndices),
+      sink: sinkIndex,
+      pressures: nodes.map(() => 0.5),
+      adjacency: [],
+      lastMaxFlow: 0,
+      rebuild() {
+        this.adjacency = this.nodes.map(() => []);
+        this.edges.forEach((edge, index) => {
+          this.adjacency[edge.a].push([index, edge.b]);
+          this.adjacency[edge.b].push([index, edge.a]);
+        });
+      },
+      addSourceNode(node, label) {
+        const index = this.nodes.length;
+        this.nodes.push({ ...node, label: label || 'New oat flake', isSource: true });
+        const nearest = this.nodes.slice(0, index).map((other, otherIndex) => ({ otherIndex, distance: Math.hypot(node.x - other.x, node.y - other.y) }))
+          .sort((a, b) => a.distance - b.distance).slice(0, 3);
+        nearest.forEach(({ otherIndex }) => this.edges.push(makeEdge(this.nodes, index, otherIndex, 5)));
+        this.sources.add(index);
+        this.pressures.push(1);
+        this.rebuild();
+        return index;
+      },
+      setSource(index, label) {
+        this.sources.add(index);
+        if (label) this.nodes[index].label = label;
+        this.nodes[index].isSource = true;
+      },
+      foodCount() {
+        return this.sources.size + (this.sink === null || this.sink === undefined || this.sources.has(this.sink) ? 0 : 1);
+      },
+      activeTubeCount() {
+        return this.edges.filter((edge) => edge.conductance > 0.1).length;
+      },
+      step(tick) {
+        const fixed = new Map();
+        this.sources.forEach((index) => fixed.set(index, 1));
+        if (this.sink !== null && this.sink !== undefined) fixed.set(this.sink, 0);
+        for (let iteration = 0; iteration < 16; iteration += 1) {
+          this.nodes.forEach((_, index) => {
+            if (fixed.has(index)) {
+              this.pressures[index] = fixed.get(index);
+              return;
+            }
+            let numerator = 0;
+            let denominator = 0;
+            this.adjacency[index].forEach(([edgeIndex, other]) => {
+              const edge = this.edges[edgeIndex];
+              const weight = edge.conductance / edge.length;
+              numerator += weight * this.pressures[other];
+              denominator += weight;
+            });
+            if (denominator > 0) this.pressures[index] = numerator / denominator;
+          });
+        }
+
+        let maxFlow = 0;
+        this.edges.forEach((edge) => {
+          edge.flow = edge.conductance / edge.length * (this.pressures[edge.a] - this.pressures[edge.b]);
+          maxFlow = Math.max(maxFlow, Math.abs(edge.flow));
+        });
+        this.lastMaxFlow = maxFlow;
+
+        const normalizedTime = clamp(tick / BIO_TICKS, 0, 1);
+        const exploreFloor = tick < STAGE_ONE_END
+          ? 0.42 - normalizedTime * 0.16
+          : tick < STAGE_TWO_END
+            ? 0.22 - ((tick - STAGE_ONE_END) / (STAGE_TWO_END - STAGE_ONE_END)) * 0.12
+            : Math.max(0.025, 0.10 - ((tick - STAGE_TWO_END) / (BIO_TICKS - STAGE_TWO_END)) * 0.075);
+        const rate = tick < STAGE_ONE_END ? 0.045 : tick < STAGE_TWO_END ? 0.09 : 0.13;
+        this.edges.forEach((edge) => {
+          const activity = maxFlow > 0 ? Math.abs(edge.flow) / maxFlow : 0;
+          edge.activity = activity;
+          const target = exploreFloor + (1 - exploreFloor) * Math.pow(activity, 0.72);
+          edge.conductance = clamp(edge.conductance + rate * (target - edge.conductance), 0.015, 1);
+        });
+      }
+    };
+    network.nodes.forEach((node, index) => { node.isSource = network.sources.has(index); });
+    network.rebuild();
+    return network;
+  }
+
+  function gridNetwork(width, height, cols, rows, sourceCells, sinkCell, allowed) {
+    const nodes = [];
+    const lookup = new Map();
+    const cellW = (width * 0.82) / cols;
+    const cellH = (height * 0.78) / rows;
+    const offsetX = (width - cols * cellW) / 2;
+    const offsetY = (height - rows * cellH) / 2;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        if (allowed && allowed[row]?.[col] !== 0) continue;
+        const key = cellKey(col, row);
+        lookup.set(key, nodes.length);
+        nodes.push({ x: offsetX + (col + 0.5) * cellW, y: offsetY + (row + 0.5) * cellH, cell: [col, row], label: '' });
+      }
+    }
+    const pairs = [];
+    nodes.forEach((node, index) => {
+      const [col, row] = node.cell;
+      [[1, 0], [0, 1]].forEach(([dc, dr]) => {
+        const other = lookup.get(cellKey(col + dc, row + dr));
+        if (other !== undefined) pairs.push([index, other]);
+      });
+    });
+    const sourceIndices = sourceCells.map((cell) => lookup.get(cellKey(cell[0], cell[1]))).filter((index) => index !== undefined);
+    const sinkIndex = lookup.get(cellKey(sinkCell[0], sinkCell[1]));
+    return {
+      nodes,
+      pairs,
+      sourceIndices,
+      sinkIndex,
+      geometry: { cols, rows, cellW, cellH, offsetX, offsetY, lookup }
+    };
+  }
+
+  function drawAdaptiveNetwork(ctx, network, tick, progress, mode, labelSize = 6) {
+    const color = mode === 'cosmic' ? '#6dd4d2' : '#f3be38';
+    const dimColor = mode === 'cosmic' ? '#277e9c' : '#88bc88';
+    ctx.globalCompositeOperation = 'lighter';
+    network.edges.forEach((edge) => {
+      const strength = clamp((edge.conductance - 0.02) / 0.72, 0, 1);
+      const visible = clamp(progress * 2.25 + strength * 0.55, 0, 1);
+      const weak = tick >= STAGE_TWO_END && strength < 0.16;
+      const opacity = weak ? strength * 0.62 : 0.12 + strength * 0.9;
+      const width = 0.65 + strength * (tick >= STAGE_TWO_END ? 4.2 : 2.4);
+      drawVein(ctx, edge.points, visible, opacity, strength > 0.28 ? color : dimColor, width, strength > 0.35 ? 14 : 3, tick, false);
+
+      if (strength > 0.16) {
+        const particles = strength > 0.55 ? 3 : 1;
+        for (let p = 0; p < particles; p += 1) {
+          let position = 0.5 + Math.sin(tick * 0.18 + edge.phase + p * 2.1) * 0.48;
+          if (edge.flow < 0) position = 1 - position;
+          const scaled = position * (edge.points.length - 1);
+          const pointIndex = Math.min(edge.points.length - 2, Math.floor(scaled));
+          const local = scaled - pointIndex;
+          const a = edge.points[pointIndex];
+          const b = edge.points[pointIndex + 1];
+          ctx.globalAlpha = Math.min(0.9, strength * 1.15);
+          ctx.fillStyle = mode === 'cosmic' ? '#b8f5ff' : '#fff0a2';
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = color;
+          ctx.beginPath();
+          ctx.arc(a.x + (b.x - a.x) * local, a.y + (b.y - a.y) * local, 0.8 + strength * 1.3, 0, TAU);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+    });
+    ctx.globalAlpha = 1;
+    network.nodes.forEach((node, index) => {
+      const isSink = index === network.sink;
+      const isSource = network.sources.has(index);
+      ctx.shadowBlur = isSource || isSink ? 18 : 8;
+      ctx.shadowColor = isSink ? '#6dd4d2' : color;
+      ctx.fillStyle = isSink ? '#b8f5ff' : isSource ? '#fff0a2' : '#d7e9ed';
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, isSink ? 8 : isSource ? 5.5 : 2.3, 0, TAU);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (node.label && (isSource || isSink || labelSize > 7)) {
+        ctx.fillStyle = '#eef4f7';
+        ctx.font = '500 10px "DM Mono", monospace';
+        ctx.fillText(node.label, node.x + 8, node.y - 5);
+      }
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   function growth() {
     const canvas = document.getElementById('growthCanvas');
     if (!canvas) return;
@@ -234,14 +462,13 @@
     const labTitle = document.getElementById('labTitle');
     const interactiveModes = new Set(['maze', 'food', 'tsp']);
     const copyTexts = {
-      maze: "Nakagaki's Maze Experiment (2000): the mould explores every open corridor, reaches the food sources, and reinforces only corridor-safe routes.",
-      food: 'The central plasmodium grows outward in all directions, senses oat flakes, and reinforces useful connecting veins. Click or tap to place more food sources.',
-      tsp: 'Candidate routes grow between food points before the strongest connected tour remains. Click or tap to add another point to the network.',
-      tokyo: 'BBC 2010 Tokyo Rail Experiment (Atsushi Tero): growth from Tokyo Central reproduces the Yamanote Ring and regional rail topology.',
-      mumbai: 'Mumbai suburban hubs act as food sources. The simulated organism explores the network, then reinforces the most useful corridors.',
-      cosmic: 'Galaxy clusters act like food sources while slime-like filaments trace the hidden cosmic web.'
+      maze: "Nakagaki's Maze Experiment (2000): open-corridor tubes start exploratory, then pressure-driven flow reinforces the shortest food-to-food connection. No route is preselected.",
+      food: 'A central plasmodium is connected to oat flakes by a growing tube field. Nutrient pressure and shuttle flow reinforce useful connections. Click or tap to add another food source.',
+      tsp: 'Travelling Man is shown as a biological multi-food network: the plasmodium connects nutrient sources through local flow feedback, not a genetic algorithm or a guaranteed TSP solver. Click or tap to add a source.',
+      tokyo: 'Tero et al. (Science, 2010): station food sources and a Tokyo inoculation node drive an adaptive tube network whose useful corridors thicken without central planning.',
+      cosmic: 'Cosmic Web is an analogy only: galaxy clusters are nutrient-like sources and the same adaptive tube rule traces a filament-like network.'
     };
-    const titles = { maze: 'NAKAGAKI MAZE EXPERIMENT', food: 'CENTRAL PLASMODIUM / FOOD SEARCH', tsp: 'CONNECTED FOOD TOUR', tokyo: 'TOKYO RAIL NETWORK / BBC 2010', mumbai: 'MUMBAI SUBURBAN NETWORK', cosmic: 'COSMIC WEB ANALOGY' };
+    const titles = { maze: 'NAKAGAKI MAZE EXPERIMENT', food: 'CENTRAL PLASMODIUM / FOOD SEARCH', tsp: 'TRAVELLING MAN / MULTI-FOOD NETWORK', tokyo: 'TOKYO RAIL NETWORK / TERO 2010', cosmic: 'COSMIC WEB / PHYSARUM ANALOGY' };
     let mode = 'maze';
     let running = false;
     let tick = 0;
@@ -256,29 +483,18 @@
       if (icon) icon.textContent = tick >= BIO_TICKS ? '↻' : running ? 'Ⅱ' : '▶';
     }
 
-    function seedFlowParticles() {
-      const branchCount = simData.shortest.length;
-      const count = mode === 'cosmic' ? 140 : mode === 'tokyo' ? 118 : 96;
-      simData.flowParticles = branchCount ? Array.from({ length: count }, (_, index) => ({
-        branch: index % branchCount,
-        position: rand(0, 1),
-        speed: rand(0.0018, 0.0048),
-        size: rand(0.8, 2.2),
-        delay: rand(0, 0.22)
-      })) : [];
-    }
-
     function updateDashboard(progress) {
       const agents = document.getElementById('agentCount');
       const foods = document.getElementById('foodCount');
       const state = document.getElementById('networkState');
       const routeState = document.getElementById('routeState');
       const progressBar = document.getElementById('stageProgress');
-      if (agents) agents.textContent = String(simData.flowParticles?.length || 0).padStart(2, '0');
-      if (foods) foods.textContent = String(simData.nodes.length).padStart(2, '0');
-      const route = tick >= BIO_TICKS ? 'OPTIMAL PATH' : tick >= STAGE_TWO_END ? 'REINFORCED' : tick >= STAGE_ONE_END ? 'FLOW CONTACT' : 'EXPLORING';
+      const network = simData.network;
+      if (agents) agents.textContent = String(network?.activeTubeCount() || 0).padStart(2, '0');
+      if (foods) foods.textContent = String(network?.foodCount() || 0).padStart(2, '0');
+      const route = tick >= BIO_TICKS ? 'OPTIMAL NETWORK' : tick >= STAGE_TWO_END ? 'REINFORCING' : tick >= STAGE_ONE_END ? 'FLOW CONTACT' : 'EXPLORING';
       if (state) state.textContent = route;
-      if (routeState) routeState.textContent = route === 'OPTIMAL PATH' ? 'OPTIMAL NETWORK LOCKED' : `${route} NETWORK`;
+      if (routeState) routeState.textContent = route === 'OPTIMAL NETWORK' ? 'ADAPTIVE NETWORK STABLE' : `${route} TUBES`;
       if (progressBar) progressBar.style.width = `${progress * 100}%`;
       document.querySelectorAll('.stage-step').forEach((step) => {
         const stage = Number(step.dataset.stage);
@@ -291,77 +507,57 @@
       const cols = MAZE_GRID[0].length;
       const rows = MAZE_GRID.length;
       const cellW = (width * 0.82) / cols;
-      const cellH = (height * 0.85) / rows;
+      const cellH = (height * 0.78) / rows;
       return { cols, rows, cellW, cellH, offsetX: (width - cols * cellW) / 2, offsetY: (height - rows * cellH) / 2 };
     }
 
     function initMode() {
       const [width, height] = fitCanvas(canvas);
       tick = 0;
-      simData = { origin: { x: width / 2, y: height / 2 }, nodes: [], shortest: [], deadends: [], stars: [], flowParticles: [] };
+      simData = { nodes: [], network: null, mazeGeometry: null, stars: [] };
       if (clickHint) clickHint.style.display = interactiveModes.has(mode) ? 'block' : 'none';
       if (labTitle) labTitle.textContent = titles[mode];
 
       if (mode === 'maze') {
         const geometry = mazeGeometry(width, height);
-        const getPoint = ([col, row]) => ({ x: geometry.offsetX + (col + 0.5) * geometry.cellW, y: geometry.offsetY + (row + 0.5) * geometry.cellH });
-        const originCell = [1, 1];
-        const exitCell = [13, 9];
-        simData.originCell = originCell;
+        const built = gridNetwork(width, height, geometry.cols, geometry.rows, [[1, 1]], [13, 9], MAZE_GRID);
+        const startIndex = built.geometry.lookup.get(cellKey(1, 1));
+        const exitIndex = built.geometry.lookup.get(cellKey(13, 9));
+        built.nodes[startIndex].label = 'Food A / source';
+        built.nodes[exitIndex].label = 'Food B / sink';
         simData.mazeGeometry = geometry;
-        simData.origin = getPoint(originCell);
-        simData.nodes = [{ ...getPoint(originCell), label: 'Food A (Entrance)' }, { ...getPoint(exitCell), label: 'Food B (Exit)' }, { ...getPoint([1, 9]), label: 'Oat Flake' }, { ...getPoint([13, 1]), label: 'Oat Flake' }];
-        const primaryPath = findMazeCorridorPath(originCell, exitCell);
-        simData.shortest = primaryPath.length ? [cellPathToPoints(primaryPath, geometry)] : [];
-        simData.deadends = [[1, 9], [13, 1], [3, 7], [9, 7]].map((cell) => {
-          const path = findMazeCorridorPath(originCell, cell);
-          return path.length ? cellPathToPoints(path, geometry) : [];
-        });
+        simData.originCell = [1, 1];
+        simData.network = createPhysarumNetwork(built.nodes, built.pairs, [startIndex], exitIndex, 0);
       } else if (mode === 'food') {
-        simData.origin = { x: width / 2, y: height / 2, label: 'Central Plasmodium' };
-        simData.nodes = Array.from({ length: 6 }, (_, i) => {
-          const angle = -Math.PI * 0.82 + (i / 5) * Math.PI * 1.64;
-          return { x: width / 2 + Math.cos(angle) * width * 0.36, y: height / 2 + Math.sin(angle) * height * 0.36, label: `Oat flake ${i + 1}` };
-        });
-        simData.shortest = simData.nodes.map((node) => createOrganicBranch([simData.origin, { x: (simData.origin.x + node.x) / 2, y: (simData.origin.y + node.y) / 2 }, node], 5));
-        simData.deadends = Array.from({ length: 8 }, (_, i) => {
-          const angle = (i / 8) * TAU + 0.2;
-          return createOrganicBranch([simData.origin, { x: simData.origin.x + Math.cos(angle) * width * 0.38, y: simData.origin.y + Math.sin(angle) * height * 0.38 }], 10);
-        });
+        const built = gridNetwork(width, height, 15, 9, [[1, 1], [7, 1], [13, 2], [2, 7], [7, 7], [13, 7]], [7, 4]);
+        built.sourceIndices.forEach((index, i) => { built.nodes[index].label = `Oat flake ${i + 1}`; });
+        built.nodes[built.sinkIndex].label = 'Central plasmodium / sink';
+        simData.network = createPhysarumNetwork(built.nodes, built.pairs, built.sourceIndices, built.sinkIndex, 4);
       } else if (mode === 'tsp') {
-        simData.origin = { x: width / 2, y: height / 2, label: 'Inoculation' };
-        simData.nodes = Array.from({ length: 9 }, (_, i) => {
+        const points = [{ label: 'Inoculation / sink', x: width * 0.5, y: height * 0.5 }];
+        for (let i = 0; i < 9; i += 1) {
           const angle = (i / 9) * TAU - Math.PI / 2;
-          return { x: width / 2 + Math.cos(angle) * width * 0.35, y: height / 2 + Math.sin(angle) * height * 0.35, label: String.fromCharCode(65 + i) };
-        });
-        const tour = [...simData.nodes, simData.nodes[0]];
-        simData.shortest = tour.slice(0, -1).map((node, i) => createOrganicBranch([node, tour[i + 1]], 5));
-        simData.deadends = [0, 2, 4].map((i) => createOrganicBranch([simData.origin, simData.nodes[i]], 8));
+          points.push({ label: `Food ${String.fromCharCode(65 + i)}`, x: width * 0.5 + Math.cos(angle) * width * 0.35, y: height * 0.5 + Math.sin(angle) * height * 0.35 });
+        }
+        simData.network = createPhysarumNetwork(points, nearestPairs(points, 3), points.slice(1).map((_, i) => i + 1), 0, 5);
       } else if (mode === 'tokyo') {
         const stations = [['Tokyo Central',0.50,0.52],['Shinjuku',0.42,0.46],['Shibuya',0.41,0.58],['Shinagawa',0.48,0.65],['Ueno',0.55,0.41],['Ikebukuro',0.43,0.36],['Yokohama',0.36,0.82],['Kawasaki',0.42,0.72],['Hachioji',0.18,0.45],['Tachikawa',0.28,0.42],['Omiya',0.45,0.18],['Chiba',0.82,0.52],['Narita',0.88,0.32],['Kamakura',0.30,0.90]];
-        simData.nodes = stations.map(([label, x, y]) => ({ label, x: x * width, y: y * height }));
-        simData.origin = simData.nodes[0];
-        const ring = [0, 3, 2, 1, 5, 4, 0];
-        const radials = [[3,7],[7,6],[6,13],[1,9],[9,8],[5,10],[4,11],[11,12]];
-        simData.shortest = ring.slice(0, -1).map((index, i) => createOrganicBranch([simData.nodes[index], simData.nodes[ring[i + 1]]], 3));
-        simData.shortest.push(...radials.map(([a, b]) => createOrganicBranch([simData.nodes[a], simData.nodes[b]], 5)));
-        simData.deadends = [createOrganicBranch([simData.origin, simData.nodes[11]], 14), createOrganicBranch([simData.nodes[3], simData.nodes[11]], 14)];
-      } else if (mode === 'mumbai') {
-        simData.nodes = MUMBAI_STATIONS.map((station) => ({ ...station, x: station.x * width, y: station.y * height }));
-        simData.origin = simData.nodes[2];
-        simData.shortest = MUMBAI_LINES.map((line) => createOrganicBranch(line.map((index) => simData.nodes[index]), 3));
-        simData.deadends = [createOrganicBranch([simData.origin, { x: width * 0.16, y: height * 0.42 }], 10), createOrganicBranch([simData.origin, { x: width * 0.62, y: height * 0.86 }], 10), createOrganicBranch([simData.origin, { x: width * 0.90, y: height * 0.16 }], 10)];
+        const nodes = stations.map(([label, x, y]) => ({ label, x: x * width, y: y * height }));
+        const ring = [0, 4, 5, 1, 2, 3, 0];
+        const radials = [[3, 7], [7, 6], [6, 13], [1, 9], [9, 8], [5, 10], [4, 11], [11, 12]];
+        const pairs = [...linePairs(ring), ...radials];
+        simData.network = createPhysarumNetwork(nodes, pairs, nodes.slice(1).map((_, i) => i + 1), 0, 3);
       } else if (mode === 'cosmic') {
         const clusters = [[0.12,0.28],[0.22,0.17],[0.33,0.31],[0.43,0.18],[0.56,0.27],[0.70,0.16],[0.84,0.30],[0.18,0.52],[0.36,0.48],[0.52,0.57],[0.69,0.46],[0.86,0.61],[0.25,0.80],[0.43,0.73],[0.61,0.84],[0.78,0.77]];
-        simData.origin = { x: width / 2, y: height / 2, label: 'Field centre' };
-        simData.nodes = clusters.map(([x, y], i) => ({ x: x * width, y: y * height, label: i % 4 === 0 ? 'Galaxy Cluster' : '' }));
-        simData.shortest = simData.nodes.slice(1).map((node, i) => createOrganicBranch([simData.nodes[i], node], 8));
+        const nodes = [{ x: width / 2, y: height / 2, label: 'Field centre / sink' }, ...clusters.map(([x, y], i) => ({ x: x * width, y: y * height, label: i % 4 === 0 ? 'Galaxy cluster' : '' }))];
+        simData.network = createPhysarumNetwork(nodes, nearestPairs(nodes, 3), nodes.slice(1).map((_, i) => i + 1), 0, 8);
         simData.stars = Array.from({ length: 80 }, () => ({ x: rand(0, width), y: rand(0, height), r: rand(0.4, 1.6), a: rand(0.2, 0.7) }));
       }
 
-      seedFlowParticles();
+      simData.nodes = simData.network.nodes;
       if (explainEl) explainEl.textContent = copyTexts[mode];
       updateLifecycle(phaseEl, timerEl, tick);
+      updateDashboard(0);
       setRunButton();
       draw();
     }
@@ -397,62 +593,14 @@
           ctx.fill();
         });
       }
-
       const progress = clamp(tick / BIO_TICKS, 0, 1);
-      const phase = updateLifecycle(phaseEl, timerEl, tick);
-      ctx.globalCompositeOperation = 'lighter';
-      simData.deadends.forEach((branch, i) => drawVein(ctx, branch, clamp(progress * 2.2 - i * 0.08, 0, 1), phase.deadendOpacity, mode === 'cosmic' ? '#3894db' : '#88bc88', 1.6, 4, tick, mode !== 'maze'));
-      simData.shortest.forEach((branch, i) => {
-        const reinforced = tick >= STAGE_TWO_END;
-        drawVein(ctx, branch, clamp(progress * 1.55 - i * 0.035, 0, 1), 0.95, mode === 'cosmic' ? '#6dd4d2' : '#f3be38', reinforced ? 4.3 : 2.5, reinforced ? 18 : 8, tick, mode !== 'maze');
-      });
-      simData.flowParticles.forEach((particle) => {
-        const branch = simData.shortest[particle.branch];
-        if (!branch || branch.length < 2) return;
-        const visible = clamp(progress * 2.1 - particle.delay, 0, 1);
-        if (visible <= 0) return;
-        particle.position = (particle.position + (running ? particle.speed : 0)) % 1;
-        const scaled = particle.position * (branch.length - 1);
-        const index = Math.min(branch.length - 2, Math.floor(scaled));
-        const local = scaled - index;
-        const a = branch[index];
-        const b = branch[index + 1];
-        const x = a.x + (b.x - a.x) * local;
-        const y = a.y + (b.y - a.y) * local;
-        ctx.globalAlpha = visible * 0.8;
-        ctx.fillStyle = mode === 'cosmic' ? '#b8f5ff' : '#fff0a2';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = mode === 'cosmic' ? '#6dd4d2' : '#f3be38';
-        ctx.beginPath();
-        ctx.arc(x, y, particle.size, 0, TAU);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-      });
-      if (simData.origin && ['food', 'tokyo', 'mumbai'].includes(mode)) {
-        ctx.shadowBlur = 24;
-        ctx.shadowColor = '#f3be38';
-        ctx.fillStyle = '#ffe066';
-        ctx.beginPath();
-        ctx.arc(simData.origin.x, simData.origin.y, 14 + Math.sin(tick * 0.08) * 2, 0, TAU);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-      simData.nodes.forEach((node) => {
-        ctx.shadowBlur = 16;
-        ctx.shadowColor = mode === 'cosmic' ? '#6dd4d2' : '#f3be38';
-        ctx.fillStyle = mode === 'cosmic' ? '#b9f4ff' : '#fff4b2';
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, mode === 'maze' ? 7 : 6, 0, TAU);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        if (node.label) {
-          ctx.fillStyle = '#eef4f7';
-          ctx.font = '500 11px "DM Mono", monospace';
-          ctx.fillText(node.label, node.x + 10, node.y - 6);
+      updateLifecycle(phaseEl, timerEl, tick);
+      if (simData.network) {
+        if (running) {
+          simData.network.step(tick);
         }
-      });
-      ctx.globalCompositeOperation = 'source-over';
+        drawAdaptiveNetwork(ctx, simData.network, tick, progress, mode, mode === 'tokyo' ? 10 : 6);
+      }
       updateDashboard(progress);
       if (running && tick < BIO_TICKS) {
         tick = Math.min(BIO_TICKS, tick + 2);
@@ -469,20 +617,15 @@
     }
 
     function addFoodAt(x, y) {
-      if (!interactiveModes.has(mode)) return;
+      if (!interactiveModes.has(mode) || !simData.network) return;
       if (mode === 'maze') {
         const cell = getClosestCorridorCell(x, y, simData.mazeGeometry);
-        const point = cellPathToPoints([cell], simData.mazeGeometry)[0];
-        const path = findMazeCorridorPath(simData.originCell, cell);
-        if (!path.length) return;
-        simData.nodes.push({ ...point, label: 'New oat flake' });
-        simData.shortest.push(cellPathToPoints(path, simData.mazeGeometry));
+        const index = simData.mazeGeometry.lookup.get(cellKey(cell[0], cell[1]));
+        if (index !== undefined) simData.network.setSource(index, 'New food source');
       } else {
-        const node = { x, y, label: mode === 'food' ? 'New oat flake' : 'New point' };
-        simData.nodes.push(node);
-        simData.shortest.push(createOrganicBranch([simData.origin, { x: (simData.origin.x + x) / 2, y: (simData.origin.y + y) / 2 }, node], 5));
+        simData.network.addSourceNode({ x, y }, mode === 'food' ? 'New oat flake' : 'New food source');
+        simData.nodes = simData.network.nodes;
       }
-      seedFlowParticles();
       tick = Math.min(tick, STAGE_ONE_END);
       running = true;
       cancelAnimationFrame(raf);
@@ -506,10 +649,7 @@
       const start = canvas._touchStart;
       canvas._touchStart = null;
       lastTouchAt = Date.now();
-      if (Math.hypot(touch.clientX - start.clientX, touch.clientY - start.clientY) < 24) {
-        const point = pointFromEvent(touch);
-        addFoodAt(point.x, point.y);
-      }
+      if (Math.hypot(touch.clientX - start.clientX, touch.clientY - start.clientY) < 24) addFoodAt(...Object.values(pointFromEvent(touch)));
     }, { passive: false });
 
     startBtn?.addEventListener('click', () => {
@@ -557,8 +697,7 @@
     let running = false;
     let tick = 0;
     let raf = 0;
-    let paths = [];
-    let exploratory = [];
+    let network = null;
     let lastSize = '';
     let resizeTimer = 0;
 
@@ -566,9 +705,12 @@
       if (startBtn) startBtn.textContent = tick >= BIO_TICKS ? 'Replay Mumbai network ↻' : running ? 'Pause Mumbai network Ⅱ' : 'Grow Mumbai network ▶';
     }
     function rebuild(width, height) {
-      paths = MUMBAI_LINES.map((line) => createOrganicBranch(line.map((index) => ({ x: MUMBAI_STATIONS[index].x * width, y: MUMBAI_STATIONS[index].y * height })), 3));
-      const hub = { x: MUMBAI_STATIONS[2].x * width, y: MUMBAI_STATIONS[2].y * height };
-      exploratory = [createOrganicBranch([hub, { x: width * 0.15, y: height * 0.35 }], 10), createOrganicBranch([hub, { x: width * 0.60, y: height * 0.88 }], 10), createOrganicBranch([hub, { x: width * 0.90, y: height * 0.15 }], 10)];
+      const nodes = MUMBAI_STATIONS.map((station) => ({ ...station, x: station.x * width, y: station.y * height }));
+      const pairs = MUMBAI_LINES.flatMap(linePairs);
+      const sourceIndices = nodes.map((_, index) => index).filter((index) => index !== 2);
+      network = createPhysarumNetwork(nodes, pairs, sourceIndices, 2, 3);
+      network.nodes[2].label = 'Dadar / sink';
+      network.nodes.forEach((node, index) => { if (index !== 2) node.label = MUMBAI_STATIONS[index].name; });
     }
     function draw() {
       const [width, height, ctx] = fitCanvas(canvas);
@@ -579,36 +721,11 @@
       }
       ctx.clearRect(0, 0, width, height);
       const progress = clamp(tick / BIO_TICKS, 0, 1);
-      const phase = updateLifecycle(phaseEl, timerEl, tick);
-      ctx.globalCompositeOperation = 'lighter';
-      exploratory.forEach((branch, i) => drawVein(ctx, branch, clamp(progress * 2.2 - i * 0.1, 0, 1), phase.deadendOpacity, '#88bc88', 1.6, 4, tick));
-      paths.forEach((branch, i) => {
-        const primary = i < 3;
-        drawVein(ctx, branch, clamp(progress * 1.45 - i * 0.1, 0, 1), primary ? 0.95 : 0.75, '#f3be38', tick >= STAGE_TWO_END ? (primary ? 4.2 : 3) : (primary ? 2.8 : 2.2), tick >= STAGE_TWO_END ? 18 : 8, tick);
-      });
-      const hub = MUMBAI_STATIONS[2];
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#f3be38';
-      ctx.fillStyle = '#ffe066';
-      ctx.beginPath();
-      ctx.arc(hub.x * width, hub.y * height, 10 + Math.sin(tick * 0.08) * 2, 0, TAU);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      MUMBAI_STATIONS.forEach((station) => {
-        const x = station.x * width;
-        const y = station.y * height;
-        ctx.shadowBlur = 14;
-        ctx.shadowColor = '#f3be38';
-        ctx.fillStyle = '#fff4b2';
-        ctx.beginPath();
-        ctx.arc(x, y, 5.5, 0, TAU);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#eef4f7';
-        ctx.font = '500 10px "DM Mono", monospace';
-        ctx.fillText(station.name, x + 8, y - 4);
-      });
-      ctx.globalCompositeOperation = 'source-over';
+      updateLifecycle(phaseEl, timerEl, tick);
+      if (running && network) {
+        network.step(tick);
+      }
+      if (network) drawAdaptiveNetwork(ctx, network, tick, progress, 'mumbai', 10);
       if (running && tick < BIO_TICKS) {
         tick = Math.min(BIO_TICKS, tick + 2);
         raf = requestAnimationFrame(draw);
@@ -627,6 +744,7 @@
       cancelAnimationFrame(raf);
       tick = 0;
       running = false;
+      lastSize = '';
       setButton();
       draw();
     });
