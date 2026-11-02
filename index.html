@@ -149,7 +149,10 @@
             <span class="live-indicator"></span>
             <span class="mode-title" id="labTitle">PHYSARUM BIOLOGICAL ENGINE</span>
           </div>
-          <div class="lab-phase-text" id="growthPhase">Ready to explore</div>
+          <div class="lab-meta">
+            <div class="lab-phase-text" id="growthPhase">Ready to explore</div>
+            <div class="timer-badge" id="timerText" aria-live="polite">⏱️ 0.0 hrs</div>
+          </div>
         </div>
 
         <div class="canvas-wrapper">
@@ -200,6 +203,10 @@
         </div>
         <div class="metro-side">
           <p class="eyebrow">The five stages</p>
+          <div class="metro-status" aria-live="polite">
+            <span id="metroPhase">Ready to explore</span>
+            <span id="metroTimerText">⏱️ 0.0 hrs</span>
+          </div>
           <ol class="stage-list">
             <li>
               <b>01 / Place sources</b>
