@@ -214,46 +214,6 @@
     return phase;
   }
 
-  function hero() {
-    const canvas = document.getElementById('heroCanvas');
-    if (!canvas) return;
-    let lastSize = '';
-    let branches = [];
-    function frame(time) {
-      const [width, height, ctx] = fitCanvas(canvas);
-      const size = `${width}x${height}`;
-      if (size !== lastSize) {
-        lastSize = size;
-        const cx = width * 0.50;
-        const cy = height * 0.52;
-        branches = [
-          [[cx, cy], [width * 0.43, height * 0.46], [width * 0.33, height * 0.38], [width * 0.23, height * 0.31]],
-          [[cx, cy], [width * 0.56, height * 0.42], [width * 0.64, height * 0.32], [width * 0.72, height * 0.26]],
-          [[cx, cy], [width * 0.58, height * 0.56], [width * 0.70, height * 0.61], [width * 0.80, height * 0.58]],
-          [[cx, cy], [width * 0.44, height * 0.61], [width * 0.34, height * 0.70], [width * 0.25, height * 0.76]],
-          [[width * 0.43, height * 0.46], [width * 0.38, height * 0.35], [width * 0.40, height * 0.23]],
-          [[width * 0.56, height * 0.42], [width * 0.57, height * 0.30], [width * 0.54, height * 0.20]]
-        ].map((branch) => createOrganicBranch(branch.map(([x, y]) => ({ x, y })), 3, 8));
-      }
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = '#050c16';
-      ctx.fillRect(0, 0, width, height);
-      ctx.globalCompositeOperation = 'lighter';
-      const pulse = 0.58 + Math.sin(time * 0.0012) * 0.10;
-      branches.forEach((branch, index) => drawVein(ctx, branch, 1, pulse - index * 0.045, index < 4 ? '#f3be38' : '#6dd4d2', index < 4 ? 1.4 : 1, 6, time * 0.08, false));
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#f3be38';
-      ctx.fillStyle = '#ffe066';
-      ctx.beginPath();
-      ctx.arc(width * 0.50, height * 0.52, 5 + Math.sin(time * 0.0015) * 1.2, 0, TAU);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalCompositeOperation = 'source-over';
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  }
-
   function makeEdge(nodes, a, b, jitter = 0) {
     const start = nodes[a];
     const end = nodes[b];
@@ -905,7 +865,6 @@
   }
 
   function init() {
-    hero();
     growth();
     metro();
   }
