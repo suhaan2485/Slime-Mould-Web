@@ -7,8 +7,10 @@ An interactive academic case study on *Physarum polycephalum*: a brainless plasm
 - Five interactive models: Nakagaki maze, food search, Travelling Man, Tokyo rail, and cosmic web.
 - One Mumbai Metro model backed by the supplied geographical map.
 - A normalized 360-tick lifecycle with exploratory foraging, food contact/cytoplasmic flow, and pruning/reinforcement.
+- A real 12-hour simulation clock with selectable 1×–3600× playback and an estimated completion time.
 - BFS maze routing constrained to open corridor cells.
 - Mouse and touch food placement for the food-driven models.
+- Source-preserving route reinforcement: every food or station source retains a conductance-weighted path to the inoculation sink while redundant tubes are pruned.
 - Fully embedded Canva project presentation: `https://www.canva.com/design/DAHZNl61o84/nnyr9t98mYhLzTkaTeFdaw/view?embed`
 - Team cards with photographs, full names, SAP IDs, and roll numbers: Suhaan Balpande (C166), Ranvirr Bhakri (C168), Paarth Asapuri (C165), and Aayush Baluapuri (C160).
 
@@ -16,7 +18,7 @@ An interactive academic case study on *Physarum polycephalum*: a brainless plasm
 
 The models use one shared Physarum-style adaptive tube network rather than a genetic algorithm, ant swarm, or preselected shortest path. Food nodes are represented as nutrient-pressure sources, the inoculation point is a sink, and each candidate tube carries pressure-driven flow. Tube conductance adapts from the magnitude of flow: exploratory conductance is available at the start, high-flow tubes strengthen, and low-flow tubes decay during pruning. Animated particles shuttle back and forth along tubes to represent cytoplasmic streaming.
 
-The maze is constrained to open corridor cells, Tokyo and Mumbai use station graphs, food search uses a spatial lattice, Travelling Man demonstrates a multi-food nutrient network rather than claiming an exact TSP solution, and Cosmic Web is explicitly labelled as a visual analogy rather than biology.
+The maze is constrained to open corridor cells, Tokyo and Mumbai use station graphs, food search shows only its six seeded oat flakes plus user-added sources (the underlying lattice is not rendered as food), Travelling Man demonstrates a connected multi-food nutrient network rather than claiming an exact TSP solution, and Cosmic Web is explicitly labelled as a visual analogy rather than biology.
 
 The biology audit follows Nakagaki, Yamada & Tóth's maze experiment ([Nature, 2000](https://doi.org/10.1038/35035159)), Tero et al.'s adaptive network experiment ([Science, 2010](https://doi.org/10.1126/science.1177894)), and Alim et al.'s pressure-driven signal propagation work ([PNAS, 2017](https://doi.org/10.1073/pnas.1618114114)).
 

@@ -15,14 +15,42 @@
   const STAGE_ONE_END = 126;
   const STAGE_TWO_END = 234;
   const TICKS_PER_HOUR = BIO_TICKS / 12;
+  const BIOLOGICAL_SECONDS = 12 * 60 * 60;
+  const DEFAULT_SPEED = 600;
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function formatEstimatedDuration(speed) {
+    const totalSeconds = BIOLOGICAL_SECONDS / Math.max(1, Number(speed) || 1);
+    if (totalSeconds < 60) return `≈ ${Math.ceil(totalSeconds)} sec`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.round(totalSeconds % 60);
+    return seconds ? `≈ ${minutes} min ${seconds} sec` : `≈ ${minutes} min`;
+  }
+
+  function bindSpeedControl(select, readout, onChange) {
+    if (!select) return DEFAULT_SPEED;
+    select.value = String(DEFAULT_SPEED);
+    const update = () => {
+      const speed = Number(select.value) || 1;
+      if (readout) readout.textContent = `${speed}× / ${formatEstimatedDuration(speed)}`;
+      onChange?.(speed);
+    };
+    select.addEventListener('change', update);
+    update();
+    return Number(select.value);
+  }
 
   function fitCanvas(canvas) {
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // The simulation is deliberately capped below retina density.  A large
+    // canvas with glow strokes is expensive to repaint, while this still
+    // stays crisp on the presentation-sized lab panel.
+    const dpr = canvas.id === 'growthCanvas' || canvas.id === 'metroCanvas'
+      ? 1
+      : Math.min(window.devicePixelRatio || 1, 2);
     const pixelWidth = Math.max(1, Math.round(width * dpr));
     const pixelHeight = Math.max(1, Math.round(height * dpr));
     const dprKey = String(dpr);
@@ -181,7 +209,7 @@
     if (phaseEl) phaseEl.textContent = phase.label;
     if (timerEl) {
       const hours = (Math.min(tick, BIO_TICKS) / TICKS_PER_HOUR).toFixed(1);
-      timerEl.textContent = `⏱️ ${hours} hrs${tick >= BIO_TICKS ? ' (Optimal Path Found)' : ''}`;
+      timerEl.textContent = `⏱️ ${hours} hrs${tick >= BIO_TICKS ? ' (Network Stabilized)' : ''}`;
     }
     return phase;
   }
@@ -230,7 +258,7 @@
     const start = nodes[a];
     const end = nodes[b];
     const length = Math.max(1, Math.hypot(end.x - start.x, end.y - start.y));
-    return { a, b, length, conductance: 0.12 + rand(0, 0.04), flow: 0, activity: 0, phase: rand(0, TAU), points: createOrganicBranch([start, end], jitter, 10) };
+    return { a, b, length, conductance: 0.12 + rand(0, 0.04), flow: 0, activity: 0, phase: rand(0, TAU), points: createOrganicBranch([start, end], jitter, 6) };
   }
 
   function uniquePairs(pairs) {
@@ -292,6 +320,8 @@
       pressures: nodes.map(() => 0.5),
       adjacency: [],
       lastMaxFlow: 0,
+      essentialEdges: new Set(),
+      stepCount: 0,
       rebuild() {
         this.adjacency = this.nodes.map(() => []);
         this.edges.forEach((edge, index) => {
@@ -307,6 +337,7 @@
         nearest.forEach(({ otherIndex }) => this.edges.push(makeEdge(this.nodes, index, otherIndex, 5)));
         this.sources.add(index);
         this.pressures.push(1);
+        this.essentialEdges.clear();
         this.rebuild();
         return index;
       },
@@ -314,6 +345,7 @@
         this.sources.add(index);
         if (label) this.nodes[index].label = label;
         this.nodes[index].isSource = true;
+        this.essentialEdges.clear();
       },
       foodCount() {
         return this.sources.size + (this.sink === null || this.sink === undefined || this.sources.has(this.sink) ? 0 : 1);
@@ -321,7 +353,51 @@
       activeTubeCount() {
         return this.edges.filter((edge) => edge.conductance > 0.1).length;
       },
+      preserveSourcePaths() {
+        const preserved = new Set();
+        if (this.sink === null || this.sink === undefined) return preserved;
+        this.sources.forEach((source) => {
+          if (source === this.sink) return;
+          const distances = this.nodes.map(() => Infinity);
+          const previous = this.nodes.map(() => null);
+          const visited = new Set();
+          distances[source] = 0;
+          for (let pass = 0; pass < this.nodes.length; pass += 1) {
+            let current = -1;
+            let best = Infinity;
+            distances.forEach((distance, index) => {
+              if (!visited.has(index) && distance < best) {
+                current = index;
+                best = distance;
+              }
+            });
+            if (current < 0 || current === this.sink) break;
+            visited.add(current);
+            this.adjacency[current].forEach(([edgeIndex, other]) => {
+              const edge = this.edges[edgeIndex];
+              const cost = edge.length / (edge.conductance + 0.035);
+              const candidate = distances[current] + cost;
+              if (candidate < distances[other]) {
+                distances[other] = candidate;
+                previous[other] = [current, edgeIndex];
+              }
+            });
+          }
+          let cursor = this.sink;
+          const seen = new Set();
+          while (previous[cursor] && !seen.has(cursor)) {
+            seen.add(cursor);
+            const [parent, edgeIndex] = previous[cursor];
+            preserved.add(edgeIndex);
+            cursor = parent;
+          }
+        });
+        this.essentialEdges = preserved;
+        this.edges.forEach((edge, index) => { edge.essential = preserved.has(index); });
+        return preserved;
+      },
       step(tick) {
+        this.stepCount += 1;
         const fixed = new Map();
         this.sources.forEach((index) => fixed.set(index, 1));
         if (this.sink !== null && this.sink !== undefined) fixed.set(this.sink, 0);
@@ -349,6 +425,7 @@
           maxFlow = Math.max(maxFlow, Math.abs(edge.flow));
         });
         this.lastMaxFlow = maxFlow;
+        if (!this.essentialEdges.size || this.stepCount % 32 === 0) this.preserveSourcePaths();
 
         const normalizedTime = clamp(tick / BIO_TICKS, 0, 1);
         const exploreFloor = tick < STAGE_ONE_END
@@ -360,7 +437,9 @@
         this.edges.forEach((edge) => {
           const activity = maxFlow > 0 ? Math.abs(edge.flow) / maxFlow : 0;
           edge.activity = activity;
-          const target = exploreFloor + (1 - exploreFloor) * Math.pow(activity, 0.72);
+          const flowTarget = exploreFloor + (1 - exploreFloor) * Math.pow(activity, 0.72);
+          const pathTarget = edge.essential ? (tick >= STAGE_TWO_END ? 0.38 : 0.46) : 0;
+          const target = Math.max(flowTarget, pathTarget);
           edge.conductance = clamp(edge.conductance + rate * (target - edge.conductance), 0.015, 1);
         });
       }
@@ -411,12 +490,15 @@
     network.edges.forEach((edge) => {
       const strength = clamp((edge.conductance - 0.02) / 0.72, 0, 1);
       const visible = clamp(progress * 2.25 + strength * 0.55, 0, 1);
-      const weak = tick >= STAGE_TWO_END && strength < 0.16;
+      const weak = tick >= STAGE_TWO_END && strength < 0.16 && !edge.essential;
       const opacity = weak ? strength * 0.62 : 0.12 + strength * 0.9;
       const width = 0.65 + strength * (tick >= STAGE_TWO_END ? 4.2 : 2.4);
-      drawVein(ctx, edge.points, visible, opacity, strength > 0.28 ? color : dimColor, width, strength > 0.35 ? 14 : 3, tick, false);
+      drawVein(ctx, edge.points, visible, opacity, strength > 0.28 ? color : dimColor, width, strength > 0.35 ? 14 : 0, tick, false);
 
-      if (strength > 0.16) {
+      // Exploratory tubes stay visible as fine lines.  Moving glow particles
+      // are reserved for tubes carrying meaningful flow; drawing one for
+      // every weak edge made large Food Search grids unnecessarily expensive.
+      if (edge.essential || strength > 0.55) {
         const particles = strength > 0.55 ? 3 : 1;
         for (let p = 0; p < particles; p += 1) {
           let position = 0.5 + Math.sin(tick * 0.18 + edge.phase + p * 2.1) * 0.48;
@@ -484,6 +566,10 @@
     let raf = 0;
     let simData = {};
     let lastTouchAt = 0;
+    let lastFrameAt = 0;
+    let lastModelTick = -Infinity;
+    let speed = DEFAULT_SPEED;
+    speed = bindSpeedControl(document.getElementById('speedSelect'), document.getElementById('speedEstimate'), (value) => { speed = value; });
 
     function setRunButton() {
       const text = document.getElementById('startText');
@@ -498,13 +584,15 @@
       const state = document.getElementById('networkState');
       const routeState = document.getElementById('routeState');
       const progressBar = document.getElementById('stageProgress');
+      const progressBarTwo = document.getElementById('stageProgressTwo');
       const network = simData.network;
       if (agents) agents.textContent = String(network?.activeTubeCount() || 0).padStart(2, '0');
       if (foods) foods.textContent = String(network?.foodCount() || 0).padStart(2, '0');
-      const route = tick >= BIO_TICKS ? 'OPTIMAL NETWORK' : tick >= STAGE_TWO_END ? 'REINFORCING' : tick >= STAGE_ONE_END ? 'FLOW CONTACT' : 'EXPLORING';
+      const route = tick >= BIO_TICKS ? 'ALL SOURCES CONNECTED' : tick >= STAGE_TWO_END ? 'REINFORCING' : tick >= STAGE_ONE_END ? 'FLOW CONTACT' : 'EXPLORING';
       if (state) state.textContent = route;
-      if (routeState) routeState.textContent = route === 'OPTIMAL NETWORK' ? 'ADAPTIVE NETWORK STABLE' : `${route} TUBES`;
-      if (progressBar) progressBar.style.width = `${progress * 100}%`;
+      if (routeState) routeState.textContent = route === 'ALL SOURCES CONNECTED' ? 'ADAPTIVE NETWORK STABLE' : `${route} TUBES`;
+      if (progressBar) progressBar.style.width = `${clamp(tick / STAGE_ONE_END, 0, 1) * 100}%`;
+      if (progressBarTwo) progressBarTwo.style.width = `${clamp((tick - STAGE_ONE_END) / (STAGE_TWO_END - STAGE_ONE_END), 0, 1) * 100}%`;
       document.querySelectorAll('.stage-step').forEach((step) => {
         const stage = Number(step.dataset.stage);
         const active = (stage === 1 && tick < STAGE_ONE_END) || (stage === 2 && tick >= STAGE_ONE_END && tick < STAGE_TWO_END) || (stage === 3 && tick >= STAGE_TWO_END);
@@ -523,6 +611,8 @@
     function initMode() {
       const [width, height] = fitCanvas(canvas);
       tick = 0;
+      lastFrameAt = 0;
+      lastModelTick = -Infinity;
       simData = { nodes: [], network: null, mazeGeometry: null, stars: [] };
       if (clickHint) clickHint.style.display = interactiveModes.has(mode) ? 'block' : 'none';
       if (labTitle) labTitle.textContent = titles[mode];
@@ -571,7 +661,7 @@
       draw();
     }
 
-    function draw() {
+    function draw(time = performance.now()) {
       const [width, height, ctx] = fitCanvas(canvas);
       ctx.fillStyle = mode === 'cosmic' ? '#030711' : '#050c16';
       ctx.fillRect(0, 0, width, height);
@@ -602,20 +692,37 @@
           ctx.fill();
         });
       }
-      const progress = clamp(tick / BIO_TICKS, 0, 1);
+      let progress = clamp(tick / BIO_TICKS, 0, 1);
       updateLifecycle(phaseEl, timerEl, tick);
       if (simData.network) {
         if (running) {
-          simData.network.step(tick);
+          if (!lastFrameAt) lastFrameAt = time;
+          // If a glow-heavy frame takes longer than a refresh interval, do
+          // not discard the elapsed biological time.  Capping at one second
+          // keeps a suspended tab from jumping wildly while preserving the
+          // selected speed on slower devices.
+          const elapsed = clamp(time - lastFrameAt, 0, 1000);
+          tick = Math.min(BIO_TICKS, tick + (elapsed / 1000) * (BIO_TICKS / BIOLOGICAL_SECONDS) * speed);
+          lastFrameAt = time;
+          // The clock remains smooth, but conductance only needs to be
+          // recalculated when the biological state has advanced by a tick.
+          // This prevents a fast demo speed from running the pressure solver
+          // hundreds of redundant times per second.
+          if (tick - lastModelTick >= 1 || tick >= BIO_TICKS) {
+            simData.network.step(tick);
+            lastModelTick = tick;
+          }
         }
+        progress = clamp(tick / BIO_TICKS, 0, 1);
+        updateLifecycle(phaseEl, timerEl, tick);
         drawAdaptiveNetwork(ctx, simData.network, tick, progress, mode, mode === 'tokyo' ? 10 : 6);
       }
       updateDashboard(progress);
       if (running && tick < BIO_TICKS) {
-        tick = Math.min(BIO_TICKS, tick + 2);
         raf = requestAnimationFrame(draw);
       } else {
         running = false;
+        lastFrameAt = 0;
         setRunButton();
       }
     }
@@ -637,6 +744,8 @@
       }
       tick = Math.min(tick, STAGE_ONE_END);
       running = true;
+      lastFrameAt = 0;
+      lastModelTick = -Infinity;
       cancelAnimationFrame(raf);
       draw();
     }
@@ -667,12 +776,14 @@
     startBtn?.addEventListener('click', () => {
       if (tick >= BIO_TICKS) initMode();
       running = !running;
+      lastFrameAt = 0;
       setRunButton();
       if (running) draw();
     });
     resetBtn?.addEventListener('click', () => {
       cancelAnimationFrame(raf);
       running = false;
+      lastFrameAt = 0;
       initMode();
     });
     document.querySelectorAll('.sim-tab').forEach((tab) => {
@@ -684,6 +795,8 @@
         });
         cancelAnimationFrame(raf);
         running = false;
+        lastFrameAt = 0;
+        lastModelTick = -Infinity;
         initMode();
       });
     });
@@ -712,6 +825,10 @@
     let network = null;
     let lastSize = '';
     let resizeTimer = 0;
+    let lastFrameAt = 0;
+    let lastModelTick = -Infinity;
+    let speed = DEFAULT_SPEED;
+    speed = bindSpeedControl(document.getElementById('metroSpeedSelect'), document.getElementById('metroSpeedEstimate'), (value) => { speed = value; });
 
     function setButton() {
       if (startBtn) startBtn.textContent = tick >= BIO_TICKS ? 'Replay Mumbai network ↻' : running ? 'Pause Mumbai network Ⅱ' : 'Grow Mumbai network ▶';
@@ -724,7 +841,7 @@
       network.nodes[2].label = 'Dadar / sink';
       network.nodes.forEach((node, index) => { if (index !== 2) node.label = MUMBAI_STATIONS[index].name; });
     }
-    function draw() {
+    function draw(time = performance.now()) {
       const [width, height, ctx] = fitCanvas(canvas);
       const size = `${width}x${height}`;
       if (size !== lastSize) {
@@ -732,23 +849,37 @@
         rebuild(width, height);
       }
       ctx.clearRect(0, 0, width, height);
-      const progress = clamp(tick / BIO_TICKS, 0, 1);
+      let progress = clamp(tick / BIO_TICKS, 0, 1);
       updateLifecycle(phaseEl, timerEl, tick);
       if (running && network) {
-        network.step(tick);
+        if (!lastFrameAt) lastFrameAt = time;
+        const elapsed = clamp(time - lastFrameAt, 0, 1000);
+        tick = Math.min(BIO_TICKS, tick + (elapsed / 1000) * (BIO_TICKS / BIOLOGICAL_SECONDS) * speed);
+        lastFrameAt = time;
+        if (tick - lastModelTick >= 1 || tick >= BIO_TICKS) {
+          network.step(tick);
+          lastModelTick = tick;
+        }
       }
+      progress = clamp(tick / BIO_TICKS, 0, 1);
+      updateLifecycle(phaseEl, timerEl, tick);
       if (network) drawAdaptiveNetwork(ctx, network, tick, progress, 'mumbai', 10);
       if (running && tick < BIO_TICKS) {
-        tick = Math.min(BIO_TICKS, tick + 2);
         raf = requestAnimationFrame(draw);
       } else {
         running = false;
+        lastFrameAt = 0;
         setButton();
       }
     }
     startBtn?.addEventListener('click', () => {
-      if (tick >= BIO_TICKS) tick = 0;
+      if (tick >= BIO_TICKS) {
+        tick = 0;
+        lastModelTick = -Infinity;
+        lastSize = '';
+      }
       running = !running;
+      lastFrameAt = 0;
       setButton();
       if (running) draw();
     });
@@ -756,6 +887,8 @@
       cancelAnimationFrame(raf);
       tick = 0;
       running = false;
+      lastFrameAt = 0;
+      lastModelTick = -Infinity;
       lastSize = '';
       setButton();
       draw();

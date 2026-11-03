@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=physarum-v7">
+  <link rel="stylesheet" href="styles.css?v=physarum-v8">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -95,10 +95,10 @@
             <div class="stage-step is-live" data-stage="1"><span>01</span><b>Explore</b><small>0–3.5 hrs</small></div>
             <div class="stage-line"><i id="stageProgress"></i></div>
             <div class="stage-step" data-stage="2"><span>02</span><b>Contact + flow</b><small>3.5–6.5 hrs</small></div>
-            <div class="stage-line"><i></i></div>
+            <div class="stage-line"><i id="stageProgressTwo"></i></div>
             <div class="stage-step" data-stage="3"><span>03</span><b>Prune + reinforce</b><small>6.5–12 hrs</small></div>
           </div>
-          <div class="lab-controls"><span class="lab-note">Click / tap is enabled for food-driven models.</span><div><button class="button button-primary" id="growthStart"><span id="startText">Start growth</span> <span id="startIcon">▶</span></button><button class="button button-ghost" id="growthReset">Reset field</button></div></div>
+          <div class="lab-controls"><span class="lab-note">Click / tap is enabled for food-driven models.</span><div class="lab-actions"><label class="speed-control" for="speedSelect"><span>SPEED</span><select id="speedSelect" aria-label="Simulation speed"><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option><option value="30">30×</option><option value="60">60×</option><option value="120">120×</option><option value="300">300×</option><option value="600" selected>600× demo</option><option value="1200">1200× fast demo</option><option value="1800">1800× fast demo</option><option value="3600">3600× fast demo</option></select><small id="speedEstimate">estimated time</small></label><button class="button button-primary" id="growthStart"><span id="startText">Start growth</span> <span id="startIcon">▶</span></button><button class="button button-ghost" id="growthReset">Reset field</button></div></div>
         </div>
       </div>
 
@@ -133,7 +133,7 @@
       <div class="section-heading compact"><div><p class="section-tag">04 / URBAN NETWORK CASE STUDY</p><h2>Mumbai, grown<br><span>as a living map.</span></h2></div><p>The single Mumbai model uses the supplied map as its geographical substrate: stations become food sources, corridors become living tubes.</p></div>
       <div class="metro-lab">
         <div class="metro-map"><img src="assets/mumbai-metro-map.png" alt="Mumbai Metro map base" id="mumbaiMapImg"><canvas id="metroCanvas" aria-label="Mumbai Metro biological network simulation"></canvas><div class="map-overlay-label top">GEOGRAPHICAL SUBSTRATE // MUMBAI</div><div class="metro-legend"><span><i class="legend-food"></i> station / food</span><span><i class="legend-vein"></i> reinforced corridor</span><span><i class="legend-fade"></i> exploratory tendril</span></div></div>
-        <div class="metro-side"><div class="metro-readout"><span id="metroPhase">Ready to explore</span><strong id="metroTimerText">⏱ 0.0 hrs</strong></div><p class="micro-label">NETWORK PROTOCOL</p><ol class="stage-list"><li><b>01 / Place sources</b><span>Churchgate, CST, Dadar, Kurla, Thane, Vashi and Panvel become nutrient nodes.</span></li><li><b>02 / Explore</b><span>Thin tendrils radiate through the map before the route is known.</span></li><li><b>03 / Reinforce</b><span>Western, Central, Harbour and Metro Line 1 corridors receive more flow.</span></li><li><b>04 / Prune</b><span>Low-use branches dissolve as the field becomes economical.</span></li></ol><div class="metro-controls"><button class="button button-primary" id="metroStart">Grow Mumbai network ▶</button><button class="button button-ghost" id="metroReset">Reset map</button></div></div>
+        <div class="metro-side"><div class="metro-readout"><span id="metroPhase">Ready to explore</span><strong id="metroTimerText">⏱ 0.0 hrs</strong></div><p class="micro-label">NETWORK PROTOCOL</p><ol class="stage-list"><li><b>01 / Place sources</b><span>Churchgate, CST, Dadar, Kurla, Thane, Vashi and Panvel become nutrient nodes.</span></li><li><b>02 / Explore</b><span>Thin tendrils radiate through the map before the route is known.</span></li><li><b>03 / Reinforce</b><span>Western, Central, Harbour and Metro Line 1 corridors receive more flow.</span></li><li><b>04 / Prune</b><span>Low-use branches dissolve as the field becomes economical.</span></li></ol><div class="metro-controls"><label class="speed-control" for="metroSpeedSelect"><span>SPEED</span><select id="metroSpeedSelect" aria-label="Mumbai simulation speed"><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option><option value="30">30×</option><option value="60">60×</option><option value="120">120×</option><option value="300">300×</option><option value="600" selected>600× demo</option><option value="1200">1200× fast demo</option><option value="1800">1800× fast demo</option><option value="3600">3600× fast demo</option></select><small id="metroSpeedEstimate">estimated time</small></label><button class="button button-primary" id="metroStart">Grow Mumbai network ▶</button><button class="button button-ghost" id="metroReset">Reset map</button></div></div>
       </div>
     </section>
 
@@ -149,6 +149,6 @@
   </main>
 
   <footer class="footer"><div><span class="brand-mini">PHYSARUM<span>.LAB</span></span><span>academic biological computing case study</span></div><span>NMIMS MUMBAI // 2026</span></footer>
-  <script src="app.js?v=physarum-v7"></script>
+  <script src="app.js?v=physarum-v8"></script>
 </body>
 </html>
